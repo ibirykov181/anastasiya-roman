@@ -5071,7 +5071,7 @@
 
 
               
-              <form id="weddingForm" action='https://script.google.com/macros/s/AKfycbxkAyDow9vReMAuzTcZgtxRRt19cYmiBRgJyWKsT08HK7RY9cbyAEbHLhBGMZpa4pjd/exec' method='POST'
+              <form id="weddingForm" action='https://script.google.com/macros/s/AKfycby6TXPT527pZCnh9hG1yoIo056VKUHodhb7P34oYoMAwYoV-7QGeQyjl0OD30mDxiI4/exec' method='POST'
                 > <input type="hidden" name="formservices[]"
                   value="36b80ea72569c9e8445ed4ab01dde788" class="js-formaction-services"> <input type="hidden"
                   name="tildaspec-formname" tabindex="-1" value="02-08-25-ivan-anastasia (W)">
@@ -5282,7 +5282,9 @@
                   </div> <!--/noindex-->
                 </div>
               </form>
-              <script>
+
+
+<script>
 document.addEventListener('DOMContentLoaded', function() {
   const form = document.getElementById('weddingForm');
   const submitBtn = form.querySelector('button[type="submit"]');
@@ -5294,22 +5296,28 @@ document.addEventListener('DOMContentLoaded', function() {
     return;
   }
   
-  // Добавляем обработчик отправки формы
-  form.addEventListener('submit', function(event) {
+  form.addEventListener('submit', async function(event) {
     event.preventDefault();
     
-    // Проверяем, не была ли форма уже отправлена
     if (localStorage.getItem(FORM_SUBMISSION_KEY)) {
       showAlreadySubmittedMessage();
       return false;
     }
     
     showLoading();
+    
     if (!validateForm()) {
       hideLoading();
       return false;
     }
-    submitForm();
+    
+    try {
+      await submitForm();
+    } catch (error) {
+      console.error('Form submission error:', error);
+      hideLoading();
+      alert('Произошла ошибка при отправке формы. Пожалуйста, попробуйте еще раз.');
+    }
   });
 
   // ========== ВАЛИДАЦИЯ ФОРМЫ ========== //
@@ -5326,13 +5334,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     hideAllErrors();
     
-    // Проверка имени
     if (!nameInput.value.trim()) {
       isValid = false;
       showError('error_1639854942360', 'Пожалуйста, введите ваше имя');
     }
     
-    // Проверка присутствия
     let attendanceChecked = false;
     attendanceRadios.forEach(radio => {
       if (radio.checked) attendanceChecked = true;
@@ -5342,16 +5348,13 @@ document.addEventListener('DOMContentLoaded', function() {
       showError('error_5639854942361', 'Пожалуйста, выберите один из вариантов');
     }
     
-    // Если гость приходит, проверяем дополнительные поля
     if (isAttending) {
-      // Проверка напитков
       const drinkCheckboxes = document.querySelectorAll('.t-checkbox:checked');
       if (drinkCheckboxes.length === 0) {
         isValid = false;
         showError('error_7639854942363', 'Пожалуйста, выберите хотя бы один напиток');
       }
       
-      // Проверка ночевки
       const stayRadios = document.querySelectorAll('input[name="Останетесь в ночь на второй день?"]');
       let stayChecked = false;
       stayRadios.forEach(radio => {
@@ -5362,7 +5365,6 @@ document.addEventListener('DOMContentLoaded', function() {
         showError('error_1748857824432', 'Пожалуйста, выберите один из вариантов');
       }
       
-      // Проверка телефона
       const phoneInput = document.getElementById('input_1748857867347');
       const phoneValue = phoneInput.value.trim();
       
@@ -5379,31 +5381,54 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ========== ОБРАБОТКА ОТПРАВКИ ========== //
-  function submitForm() {
+  async function submitForm() {
     const formData = new FormData(form);
+    const googleScriptUrl = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
     
-    fetch(form.action, {
-      method: 'POST',
-      body: formData
-    })
-    .then(response => {
-      hideLoading();
-      if (response.ok) {
-        localStorage.setItem(FORM_SUBMISSION_KEY, 'true');
-        showPopupSuccess();
-        disableForm();
-      } else {
-        alert('Произошла ошибка при отправке формы. Пожалуйста, попробуйте еще раз.');
-      }
-    })
-    .catch(error => {
-      hideLoading();
-      console.error('Error:', error);
-      alert('Произошла ошибка при отправке формы. Пожалуйста, попробуйте еще раз.');
+    // Преобразуем FormData в объект
+    const formObject = {};
+    formData.forEach((value, key) => {
+      formObject[key] = value;
     });
+    
+    // Добавляем дополнительные параметры
+    formObject['timestamp'] = new Date().toISOString();
+    formObject['pageUrl'] = window.location.href;
+    
+    try {
+      const response = await fetch(googleScriptUrl, {
+        method: 'POST',
+        mode: 'no-cors', // Используем no-cors для обхода ограничений
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(formObject).toString()
+      });
+      
+      // Для режима no-cors мы не получим response, поэтому считаем успешным
+      localStorage.setItem(FORM_SUBMISSION_KEY, 'true');
+      showPopupSuccess();
+      disableForm();
+      
+      // Дополнительная отправка данных на Tilda (если нужно)
+      try {
+        await fetch(form.action, {
+          method: 'POST',
+          body: formData
+        });
+      } catch (tildaError) {
+        console.log('Tilda submission failed (non-critical)', tildaError);
+      }
+      
+    } catch (error) {
+      console.error('Google Apps Script submission failed:', error);
+      throw error;
+    } finally {
+      hideLoading();
+    }
   }
 
-  // ========== АНИМАЦИЯ ЗАГРУЗКИ ========== //
+  // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========== //
   function showLoading() {
     submitBtn.dataset.originalText = submitBtn.textContent;
     submitBtn.innerHTML = `
@@ -5445,84 +5470,46 @@ document.addEventListener('DOMContentLoaded', function() {
     if (styles) styles.remove();
   }
 
-  // ========== POPUP-СООБЩЕНИЯ ========== //
   function showPopupSuccess() {
-    createPopup(
-      'Вы успешно добавлены в список гостей!',
-      'Спасибо за ваш ответ! Мы рады будем видеть вас на нашем торжестве.'
-    );
-    form.style.display = 'none';
+    const popup = document.createElement('div');
+    popup.className = 'form-success-popup';
+    popup.innerHTML = `
+      <div class="popup-content">
+        <span class="close-btn">&times;</span>
+        <h2>Вы успешно добавлены в список гостей!</h2>
+        <p>Спасибо за ваш ответ! Мы рады будем видеть вас на нашем торжестве.</p>
+      </div>
+    `;
+    
+    document.body.appendChild(popup);
+    document.body.style.overflow = 'hidden';
+    
+    popup.querySelector('.close-btn').addEventListener('click', () => {
+      document.body.removeChild(popup);
+      document.body.style.overflow = '';
+    });
   }
 
   function showAlreadySubmittedMessage() {
-    createPopup(
-      'Форма уже отправлена',
-      'Вы уже отправили ответ на это приглашение. Спасибо!'
-    );
-  }
-
-  function createPopup(title, text) {
-    const popupOverlay = document.createElement('div');
-    const popupContent = document.createElement('div');
-    const popupClose = document.createElement('span');
-    const popupTitle = document.createElement('h2');
-    const popupText = document.createElement('p');
+    const popup = document.createElement('div');
+    popup.className = 'form-success-popup';
+    popup.innerHTML = `
+      <div class="popup-content">
+        <span class="close-btn">&times;</span>
+        <h2>Форма уже отправлена</h2>
+        <p>Вы уже отправили ответ на это приглашение. Спасибо!</p>
+      </div>
+    `;
     
-    popupOverlay.style.position = 'fixed';
-    popupOverlay.style.top = '0';
-    popupOverlay.style.left = '0';
-    popupOverlay.style.width = '100%';
-    popupOverlay.style.height = '100%';
-    popupOverlay.style.backgroundColor = 'rgba(0,0,0,0.7)';
-    popupOverlay.style.display = 'flex';
-    popupOverlay.style.justifyContent = 'center';
-    popupOverlay.style.alignItems = 'center';
-    popupOverlay.style.zIndex = '1000';
+    document.body.appendChild(popup);
+    document.body.style.overflow = 'hidden';
     
-    popupContent.style.backgroundColor = '#fff';
-    popupContent.style.padding = '30px';
-    popupContent.style.borderRadius = '10px';
-    popupContent.style.textAlign = 'center';
-    popupContent.style.position = 'relative';
-    popupContent.style.maxWidth = '400px';
-    popupContent.style.width = '90%';
-    popupContent.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-    
-    popupClose.innerHTML = '&times;';
-    popupClose.style.position = 'absolute';
-    popupClose.style.top = '10px';
-    popupClose.style.right = '15px';
-    popupClose.style.fontSize = '24px';
-    popupClose.style.cursor = 'pointer';
-    popupClose.style.color = '#888';
-    
-    popupTitle.textContent = title;
-    popupTitle.style.color = '#4CAF50';
-    popupTitle.style.marginBottom = '20px';
-    
-    popupText.textContent = text;
-    popupText.style.fontSize = '16px';
-    popupText.style.color = '#555';
-    
-    popupContent.appendChild(popupClose);
-    popupContent.appendChild(popupTitle);
-    popupContent.appendChild(popupText);
-    popupOverlay.appendChild(popupContent);
-    
-    document.body.appendChild(popupOverlay);
-    
-    popupClose.addEventListener('click', function() {
-      document.body.removeChild(popupOverlay);
-    });
-    
-    popupOverlay.addEventListener('click', function(e) {
-      if (e.target === popupOverlay) {
-        document.body.removeChild(popupOverlay);
-      }
+    popup.querySelector('.close-btn').addEventListener('click', () => {
+      document.body.removeChild(popup);
+      document.body.style.overflow = '';
     });
   }
 
-  // ========== БЛОКИРОВКА ФОРМЫ ========== //
   function disableForm() {
     const inputs = form.querySelectorAll('input, textarea, select, button');
     inputs.forEach(input => {
@@ -5530,14 +5517,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     const message = document.createElement('div');
-    message.style.color = '#4CAF50';
-    message.style.marginTop = '20px';
-    message.style.fontWeight = 'bold';
+    message.className = 'form-submitted-message';
     message.textContent = 'Вы уже отправили ответ. Спасибо!';
     form.appendChild(message);
   }
 
-  // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========== //
   function showError(errorId, message) {
     const errorElement = document.getElementById(errorId);
     if (errorElement) {
@@ -5557,12 +5541,66 @@ document.addEventListener('DOMContentLoaded', function() {
   function hideError(errorId) {
     const errorElement = document.getElementById(errorId);
     if (errorElement) {
-      errorElement.textContent = '';
-      errorElement.style.display = 'none';
+      element.textContent = '';
+      element.style.display = 'none';
     }
   }
   
-  // ========== ОБРАБОТЧИКИ СОБЫТИЙ ========== //
+  // Добавляем стили для попапов
+  const style = document.createElement('style');
+  style.textContent = `
+    .form-success-popup {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .popup-content {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      position: relative;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #888;
+    }
+    .popup-content h2 {
+      color: #4CAF50;
+      margin-bottom: 20px;
+    }
+    .popup-content p {
+      font-size: 16px;
+      color: #555;
+    }
+    .form-submitted-message {
+      color: #4CAF50;
+      margin-top: 20px;
+      font-weight: bold;
+      text-align: center;
+      padding: 15px;
+      border: 1px solid #4CAF50;
+      border-radius: 5px;
+      background-color: rgba(76, 175, 80, 0.1);
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Обработчики событий для скрытия ошибок при вводе
   document.getElementById('input_1639854942360')?.addEventListener('input', function() {
     hideError('error_1639854942360');
   });
@@ -5595,7 +5633,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-</script>
+</script>              
+
+
               <style>
                 #rec1040904421 .t-form__successbox,
                 #rec1040904421 .t-form__errorbox-wrapper {
