@@ -81,33 +81,7 @@
       }
     })();</script>
 
-  <style>
-  /* Анимация кнопки при отправке */
-  .t-submit[disabled] {
-    position: relative;
-  }
-  .t-submit[disabled]::after {
-    content: "";
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 1s ease-in-out infinite;
-    position: absolute;
-    right: 20px;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
   
-  /* Скрытие поля телефона по умолчанию */
-  [data-input-lid="1748857867347"] {
-    display: none;
-    transition: all 0.3s ease;
-  }
-</style>
 </head>
 
 <body class="t-body" style="margin:0;"> <!--allrecords-->
