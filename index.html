@@ -80,6 +80,34 @@
         document.addEventListener('DOMContentLoaded', t_setvisRecs);
       }
     })();</script>
+
+  <style>
+  /* Анимация кнопки при отправке */
+  .t-submit[disabled] {
+    position: relative;
+  }
+  .t-submit[disabled]::after {
+    content: "";
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+    position: absolute;
+    right: 20px;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  /* Скрытие поля телефона по умолчанию */
+  [data-input-lid="1748857867347"] {
+    display: none;
+    transition: all 0.3s ease;
+  }
+</style>
 </head>
 
 <body class="t-body" style="margin:0;"> <!--allrecords-->
@@ -5071,7 +5099,7 @@
 
 
               
-              <form id="weddingForm" action='https://script.google.com/macros/s/AKfycby33j5dl1JlJFRcbiQ5wUEI2XhZqBuktBi1Olutg4XwxksPyJ71gED9Ku2ZHl8jGC2E/exec' method='POST'
+              <form id="weddingForm" action='https://script.google.com/macros/s/AKfycbx3gl7miFshXQ3gGJcN2I5pfOjAuJoWJaOhlWvllInkFZMDws5qTLU3peAA_UalsA/exec' method='POST'
                 > <input type="hidden" name="formservices[]"
                   value="36b80ea72569c9e8445ed4ab01dde788" class="js-formaction-services"> <input type="hidden"
                   name="tildaspec-formname" tabindex="-1" value="02-08-25-ivan-anastasia (W)">
@@ -5286,221 +5314,129 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Конфигурация
-  const CONFIG = {
-    GOOGLE_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycby33j5dl1JlJFRcbiQ5wUEI2XhZqBuktBi1Olutg4XwxksPyJ71gED9Ku2ZHl8jGC2E/exec',
-    BACKUP_URL: 'https://your-backup-api.com/submit',
-    FORM_ID: 'weddingForm',
-    STORAGE_KEY: 'formSubmitted_' + window.location.pathname
-  };
+  const form = document.getElementById('weddingForm');
+  const phoneField = document.getElementById('input_1748857867347');
+  const phoneError = document.getElementById('error_1748857867347');
+  const FORM_SUBMISSION_KEY = 'weddingFormSubmitted_' + window.location.pathname;
 
-  // Элементы формы
-  const form = document.getElementById(CONFIG.FORM_ID);
-  const submitBtn = form.querySelector('button[type="submit"]');
-  
   // Проверка предыдущей отправки
-  if (localStorage.getItem(CONFIG.STORAGE_KEY)) {
+  if (localStorage.getItem(FORM_SUBMISSION_KEY)) {
     disableForm();
     return;
   }
 
-  // Обработчик отправки
+  // Обработка изменения варианта присутствия
+  document.querySelectorAll('input[name="Сможете ли вы присутствовать?"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      const phoneGroup = phoneField.closest('.t-input-group');
+      if (this.value === "Смогу прийти") {
+        phoneGroup.style.display = 'block';
+        phoneField.setAttribute('data-tilda-req', '1');
+      } else {
+        phoneGroup.style.display = 'none';
+        phoneField.removeAttribute('data-tilda-req');
+        phoneError.textContent = '';
+      }
+    });
+  });
+
+  // Обработка отправки формы
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    if (localStorage.getItem(CONFIG.STORAGE_KEY)) {
+    if (localStorage.getItem(FORM_SUBMISSION_KEY)) {
       showMessage('Вы уже отправили ответ!');
       return;
     }
-    
-    showLoading();
-    
+
+    // Получение данных формы
+    const formData = {
+      name: document.getElementById('input_1639854942360').value.trim(),
+      phone: phoneField.value.trim(),
+      attendance: document.querySelector('input[name="Сможете ли вы присутствовать?"]:checked')?.value,
+      companions: document.getElementById('input_1639854942362')?.value.trim() || "",
+      stay: document.querySelector('input[name="Останетесь в ночь на второй день?"]:checked')?.value || "",
+      drinks: Array.from(document.querySelectorAll('input[name="Предпочтения по напиткам"]:checked'))
+        .map(el => el.value).join('; ')
+    };
+
+    // Валидация
     try {
-      const formData = getFormData();
       validateForm(formData);
-      
-      // Основная отправка
-      const success = await sendData(CONFIG.GOOGLE_SCRIPT_URL, formData);
-      
-      if (success) {
-        // Проверка сохранения
-        const isSaved = await verifySubmission(formData.phone);
-        
-        if (isSaved) {
-          completeSubmission();
-        } else {
-          // Резервная отправка
-          await sendBackup(formData);
-          completeSubmission();
-        }
-      }
+      await submitForm(formData);
+      completeSubmission();
     } catch (error) {
-      console.error('Ошибка:', error);
       showMessage(error.message, 'error');
-    } finally {
-      hideLoading();
     }
   });
 
-  // ===== ОСНОВНЫЕ ФУНКЦИИ ===== //
-  
-  function getFormData() {
-    return {
-      name: document.getElementById('input_1639854942360').value.trim(),
-      phone: document.getElementById('input_1748857867347').value.trim(),
-      attendance: document.querySelector('input[name="Сможете ли вы присутствовать?"]:checked')?.value || '',
-      companions: document.querySelector('input[name="Будет ли с вами кто-то еще?"]:checked')?.value || '',
-      stayOvernight: document.querySelector('input[name="Останетесь в ночь на второй день?"]:checked')?.value || '',
-      drinks: Array.from(document.querySelectorAll('input[name="Предпочтения по напиткам"]:checked'))
-        .map(el => el.value).join(', ')
-    };
-  }
-
+  // Функции валидации и отправки
   function validateForm(data) {
     const errors = [];
     
     if (!data.name) errors.push('Укажите ФИО');
     if (!data.attendance) errors.push('Укажите, придёте ли вы');
-    if (!/^[\d+]{11,}$/.test(data.phone.replace(/[^\d+]/g, ''))) {
-      errors.push('Введите корректный номер телефона');
+    
+    // Проверка телефона только если гость придет
+    if (data.attendance === "Смогу прийти") {
+      const digits = data.phone.replace(/\D/g, '');
+      if (digits.length < 6) {
+        errors.push('Телефон должен содержать минимум 6 цифр');
+        phoneError.textContent = 'Введите корректный номер телефона (минимум 6 цифр)';
+        phoneError.style.display = 'block';
+      }
     }
     
     if (errors.length) throw new Error(errors.join('\n'));
   }
 
-  async function sendData(url, data) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          "Фамилия Имя": data.name,
-          "Phone": data.phone,
-          "Сможете ли вы присутствовать?": data.attendance,
-          "Будет ли с вами кто-то еще?": data.companions,
-          "Останетесь в ночь на второй день?": data.stayOvernight,
-          "Предпочтения по напиткам": data.drinks
-        }).toString()
-      });
-      
-      if (!response.ok) throw new Error('Ошибка сервера');
-      
-      const result = await response.json();
-      if (result.status !== "success") throw new Error(result.message);
-      
-      return true;
-    } catch (error) {
-      console.log('Основная отправка не удалась:', error);
-      return false;
+  async function submitForm(data) {
+    const formPayload = new URLSearchParams();
+    formPayload.append('Фамилия Имя', data.name);
+    formPayload.append('Сможете ли вы присутствовать?', data.attendance);
+    formPayload.append('Будет ли с вами кто-то еще?', data.companions);
+    formPayload.append('Останетесь в ночь на второй день?', data.stay);
+    formPayload.append('Предпочтения по напиткам', data.drinks);
+    
+    if (data.attendance === "Смогу прийти") {
+      formPayload.append('Phone', data.phone);
     }
-  }
 
-  async function verifySubmission(phone) {
-    try {
-      const response = await fetch(`${CONFIG.GOOGLE_SCRIPT_URL}?action=verify&phone=${encodeURIComponent(phone)}`);
-      const result = await response.json();
-      return result.exists;
-    } catch (error) {
-      console.log('Проверка не удалась:', error);
-      return false;
-    }
-  }
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formPayload
+    });
 
-  async function sendBackup(data) {
-    try {
-      await fetch(CONFIG.BACKUP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-    } catch (error) {
-      console.log('Резервная отправка не удалась:', error);
-      throw new Error('Не удалось сохранить данные. Пожалуйста, свяжитесь с организаторами.');
-    }
+    if (!response.ok) throw new Error('Ошибка сервера');
+    
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error || 'Ошибка сохранения данных');
   }
 
   function completeSubmission() {
-    localStorage.setItem(CONFIG.STORAGE_KEY, 'true');
-    showMessage('Ваши данные сохранены!', 'success');
+    localStorage.setItem(FORM_SUBMISSION_KEY, 'true');
+    showMessage('Благодарим за ответ!', 'success');
     disableForm();
   }
 
-  // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===== //
-
-  function showLoading() {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = `
-      <span class="spinner"></span> Отправка...
-    `;
-    
-    const style = document.createElement('style');
-    style.id = 'spinner-style';
-    style.textContent = `
-      .spinner {
-        display: inline-block;
-        width: 18px;
-        height: 18px;
-        border: 2px solid rgba(255,255,255,0.3);
-        border-radius: 50%;
-        border-top-color: #fff;
-        animation: spin 1s ease-in-out infinite;
-        margin-right: 8px;
-        vertical-align: middle;
-      }
-      @keyframes spin { to { transform: rotate(360deg); } }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function hideLoading() {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Отправить';
-    const style = document.getElementById('spinner-style');
-    if (style) style.remove();
-  }
-
-  function showMessage(text, type = 'success') {
-    const popup = document.createElement('div');
-    popup.className = `popup ${type}`;
-    popup.innerHTML = `
-      <div class="popup-content">
-        <p>${text}</p>
-      </div>
-    `;
-    
-    document.body.appendChild(popup);
-    setTimeout(() => popup.remove(), 5000);
-    
-    // Стили можно добавить в CSS или через JS
-    const style = document.createElement('style');
-    style.textContent = `
-      .popup {
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 15px 25px;
-        border-radius: 5px;
-        color: white;
-        z-index: 1000;
-        animation: fadeIn 0.3s;
-      }
-      .success { background: #4CAF50; }
-      .error { background: #f44336; }
-      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    `;
-    document.head.appendChild(style);
-  }
-
+  // Вспомогательные функции
   function disableForm() {
     form.querySelectorAll('input, button, textarea, select').forEach(el => {
       el.disabled = true;
     });
+    form.querySelector('.t-submit').style.opacity = '0.5';
+  }
+
+  function showMessage(text, type = 'success') {
+    const messageBox = form.querySelector('.js-successbox');
+    messageBox.textContent = text;
+    messageBox.style.display = 'block';
+    messageBox.style.color = type === 'success' ? '#4CAF50' : '#f44336';
     
-    const message = document.createElement('p');
-    message.className = 'form-disabled-message';
-    message.textContent = 'Спасибо! Вы уже отправили ответ.';
-    form.appendChild(message);
+    setTimeout(() => {
+      messageBox.style.display = 'none';
+    }, 5000);
   }
 });
 </script>              
