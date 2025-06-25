@@ -5073,7 +5073,7 @@
 
 
               
-              <form id="weddingForm" action='https://script.google.com/macros/s/AKfycbx3gl7miFshXQ3gGJcN2I5pfOjAuJoWJaOhlWvllInkFZMDws5qTLU3peAA_UalsA/exec' method='POST'
+              <form id="weddingForm" action='https://script.google.com/macros/s/AKfycbxwRHpGy3pzJoulZwOyhS3NGNmbf6FVNNd720XO5ZI4Qi670A_DJwOIY1bwIM3D1Lqb/exec' method='POST'
                 > <input type="hidden" name="formservices[]"
                   value="36b80ea72569c9e8445ed4ab01dde788" class="js-formaction-services"> <input type="hidden"
                   name="tildaspec-formname" tabindex="-1" value="02-08-25-ivan-anastasia (W)">
@@ -5289,129 +5289,315 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const form = document.getElementById('weddingForm');
-  const phoneField = document.getElementById('input_1748857867347');
-  const phoneError = document.getElementById('error_1748857867347');
+  const submitBtn = form.querySelector('button[type="submit"]');
   const FORM_SUBMISSION_KEY = 'weddingFormSubmitted_' + window.location.pathname;
-
-  // Проверка предыдущей отправки
+  
+  // Проверяем, не была ли форма уже отправлена
   if (localStorage.getItem(FORM_SUBMISSION_KEY)) {
     disableForm();
     return;
   }
+  
+  // Добавляем обработчик отправки формы
+  form.addEventListener('submit', function(event) {
+    event.preventDefault();
+    
+    // Проверяем, не была ли форма уже отправлена
+    if (localStorage.getItem(FORM_SUBMISSION_KEY)) {
+      showAlreadySubmittedMessage();
+      return false;
+    }
+    
+    showLoading();
+    if (!validateForm()) {
+      hideLoading();
+      return false;
+    }
+    submitForm();
+  });
 
-  // Обработка изменения варианта присутствия
+  // ========== ВАЛИДАЦИЯ ФОРМЫ ========== //
+  function validatePhone(phone) {
+    const digitsOnly = phone.replace(/\D/g, '');
+    return digitsOnly.length >= 10;
+  }
+
+  function validateForm() {
+    const nameInput = document.getElementById('input_1639854942360');
+    const attendanceRadios = document.querySelectorAll('input[name="Сможете ли вы присутствовать?"]');
+    const isAttending = document.querySelector('input[name="Сможете ли вы присутствовать?"][value="Смогу прийти"]:checked');
+    let isValid = true;
+    
+    hideAllErrors();
+    
+    // Проверка имени
+    if (!nameInput.value.trim()) {
+      isValid = false;
+      showError('error_1639854942360', 'Пожалуйста, введите ваше имя');
+    }
+    
+    // Проверка присутствия
+    let attendanceChecked = false;
+    attendanceRadios.forEach(radio => {
+      if (radio.checked) attendanceChecked = true;
+    });
+    if (!attendanceChecked) {
+      isValid = false;
+      showError('error_5639854942361', 'Пожалуйста, выберите один из вариантов');
+    }
+    
+    // Если гость приходит, проверяем дополнительные поля
+    if (isAttending) {
+      // Проверка напитков
+      const drinkCheckboxes = document.querySelectorAll('.t-checkbox:checked');
+      if (drinkCheckboxes.length === 0) {
+        isValid = false;
+        showError('error_7639854942363', 'Пожалуйста, выберите хотя бы один напиток');
+      }
+      
+      // Проверка ночевки
+      const stayRadios = document.querySelectorAll('input[name="Останетесь в ночь на второй день?"]');
+      let stayChecked = false;
+      stayRadios.forEach(radio => {
+        if (radio.checked) stayChecked = true;
+      });
+      if (!stayChecked) {
+        isValid = false;
+        showError('error_1748857824432', 'Пожалуйста, выберите один из вариантов');
+      }
+      
+      // Проверка телефона
+      const phoneInput = document.getElementById('input_1748857867347');
+      const phoneValue = phoneInput.value.trim();
+      
+      if (!phoneValue) {
+        isValid = false;
+        showError('error_1748857867347', 'Пожалуйста, введите номер телефона');
+      } else if (!validatePhone(phoneValue)) {
+        isValid = false;
+        showError('error_1748857867347', 'Номер телефона должен содержать минимум 10 цифр');
+      }
+    }
+    
+    return isValid;
+  }
+
+  // ========== ОБРАБОТКА ОТПРАВКИ ========== //
+  function submitForm() {
+    const formData = new FormData(form);
+    
+    fetch(form.action, {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => {
+      hideLoading();
+      if (response.ok) {
+        localStorage.setItem(FORM_SUBMISSION_KEY, 'true');
+        showPopupSuccess();
+        disableForm();
+      } else {
+        alert('Произошла ошибка при отправке формы. Пожалуйста, попробуйте еще раз.');
+      }
+    })
+    .catch(error => {
+      hideLoading();
+      console.error('Error:', error);
+      alert('Произошла ошибка при отправке формы. Пожалуйста, попробуйте еще раз.');
+    });
+  }
+
+  // ========== АНИМАЦИЯ ЗАГРУЗКИ ========== //
+  function showLoading() {
+    submitBtn.dataset.originalText = submitBtn.textContent;
+    submitBtn.innerHTML = `
+      <span class="spinner"></span>
+      <span class="text">Отправка...</span>
+    `;
+    submitBtn.disabled = true;
+    
+    const style = document.createElement('style');
+    style.id = 'buttonLoadingStyles';
+    style.textContent = `
+      .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
+        vertical-align: middle;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      button[type="submit"] .text {
+        vertical-align: middle;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function hideLoading() {
+    if (submitBtn.dataset.originalText) {
+      submitBtn.innerHTML = submitBtn.dataset.originalText;
+    }
+    submitBtn.disabled = false;
+    const styles = document.getElementById('buttonLoadingStyles');
+    if (styles) styles.remove();
+  }
+
+  // ========== POPUP-СООБЩЕНИЯ ========== //
+  function showPopupSuccess() {
+    createPopup(
+      'Вы успешно добавлены в список гостей!',
+      'Спасибо за ваш ответ! Мы рады будем видеть вас на нашем торжестве.'
+    );
+    form.style.display = 'none';
+  }
+
+  function showAlreadySubmittedMessage() {
+    createPopup(
+      'Форма уже отправлена',
+      'Вы уже отправили ответ на это приглашение. Спасибо!'
+    );
+  }
+
+  function createPopup(title, text) {
+    const popupOverlay = document.createElement('div');
+    const popupContent = document.createElement('div');
+    const popupClose = document.createElement('span');
+    const popupTitle = document.createElement('h2');
+    const popupText = document.createElement('p');
+    
+    popupOverlay.style.position = 'fixed';
+    popupOverlay.style.top = '0';
+    popupOverlay.style.left = '0';
+    popupOverlay.style.width = '100%';
+    popupOverlay.style.height = '100%';
+    popupOverlay.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    popupOverlay.style.display = 'flex';
+    popupOverlay.style.justifyContent = 'center';
+    popupOverlay.style.alignItems = 'center';
+    popupOverlay.style.zIndex = '1000';
+    
+    popupContent.style.backgroundColor = '#fff';
+    popupContent.style.padding = '30px';
+    popupContent.style.borderRadius = '10px';
+    popupContent.style.textAlign = 'center';
+    popupContent.style.position = 'relative';
+    popupContent.style.maxWidth = '400px';
+    popupContent.style.width = '90%';
+    popupContent.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
+    
+    popupClose.innerHTML = '&times;';
+    popupClose.style.position = 'absolute';
+    popupClose.style.top = '10px';
+    popupClose.style.right = '15px';
+    popupClose.style.fontSize = '24px';
+    popupClose.style.cursor = 'pointer';
+    popupClose.style.color = '#888';
+    
+    popupTitle.textContent = title;
+    popupTitle.style.color = '#4CAF50';
+    popupTitle.style.marginBottom = '20px';
+    
+    popupText.textContent = text;
+    popupText.style.fontSize = '16px';
+    popupText.style.color = '#555';
+    
+    popupContent.appendChild(popupClose);
+    popupContent.appendChild(popupTitle);
+    popupContent.appendChild(popupText);
+    popupOverlay.appendChild(popupContent);
+    
+    document.body.appendChild(popupOverlay);
+    
+    popupClose.addEventListener('click', function() {
+      document.body.removeChild(popupOverlay);
+    });
+    
+    popupOverlay.addEventListener('click', function(e) {
+      if (e.target === popupOverlay) {
+        document.body.removeChild(popupOverlay);
+      }
+    });
+  }
+
+  // ========== БЛОКИРОВКА ФОРМЫ ========== //
+  function disableForm() {
+    const inputs = form.querySelectorAll('input, textarea, select, button');
+    inputs.forEach(input => {
+      input.disabled = true;
+    });
+    
+    const message = document.createElement('div');
+    message.style.color = '#4CAF50';
+    message.style.marginTop = '20px';
+    message.style.fontWeight = 'bold';
+    message.textContent = 'Вы уже отправили ответ. Спасибо!';
+    form.appendChild(message);
+  }
+
+  // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========== //
+  function showError(errorId, message) {
+    const errorElement = document.getElementById(errorId);
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+  }
+  
+  function hideAllErrors() {
+    const errorElements = document.querySelectorAll('.t-input-error');
+    errorElements.forEach(element => {
+      element.textContent = '';
+      element.style.display = 'none';
+    });
+  }
+  
+  function hideError(errorId) {
+    const errorElement = document.getElementById(errorId);
+    if (errorElement) {
+      errorElement.textContent = '';
+      errorElement.style.display = 'none';
+    }
+  }
+  
+  // ========== ОБРАБОТЧИКИ СОБЫТИЙ ========== //
+  document.getElementById('input_1639854942360')?.addEventListener('input', function() {
+    hideError('error_1639854942360');
+  });
+  
   document.querySelectorAll('input[name="Сможете ли вы присутствовать?"]').forEach(radio => {
     radio.addEventListener('change', function() {
-      const phoneGroup = phoneField.closest('.t-input-group');
-      if (this.value === "Смогу прийти") {
-        phoneGroup.style.display = 'block';
-        phoneField.setAttribute('data-tilda-req', '1');
-      } else {
-        phoneGroup.style.display = 'none';
-        phoneField.removeAttribute('data-tilda-req');
-        phoneError.textContent = '';
-      }
+      hideError('error_5639854942361');
     });
   });
-
-  // Обработка отправки формы
-  form.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    if (localStorage.getItem(FORM_SUBMISSION_KEY)) {
-      showMessage('Вы уже отправили ответ!');
-      return;
-    }
-
-    // Получение данных формы
-    const formData = {
-      name: document.getElementById('input_1639854942360').value.trim(),
-      phone: phoneField.value.trim(),
-      attendance: document.querySelector('input[name="Сможете ли вы присутствовать?"]:checked')?.value,
-      companions: document.getElementById('input_1639854942362')?.value.trim() || "",
-      stay: document.querySelector('input[name="Останетесь в ночь на второй день?"]:checked')?.value || "",
-      drinks: Array.from(document.querySelectorAll('input[name="Предпочтения по напиткам"]:checked'))
-        .map(el => el.value).join('; ')
-    };
-
-    // Валидация
-    try {
-      validateForm(formData);
-      await submitForm(formData);
-      completeSubmission();
-    } catch (error) {
-      showMessage(error.message, 'error');
-    }
+  
+  document.querySelectorAll('input[name="Предпочтения по напиткам"]').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      hideError('error_7639854942363');
+    });
   });
-
-  // Функции валидации и отправки
-  function validateForm(data) {
-    const errors = [];
-    
-    if (!data.name) errors.push('Укажите ФИО');
-    if (!data.attendance) errors.push('Укажите, придёте ли вы');
-    
-    // Проверка телефона только если гость придет
-    if (data.attendance === "Смогу прийти") {
-      const digits = data.phone.replace(/\D/g, '');
-      if (digits.length < 6) {
-        errors.push('Телефон должен содержать минимум 6 цифр');
-        phoneError.textContent = 'Введите корректный номер телефона (минимум 6 цифр)';
-        phoneError.style.display = 'block';
-      }
-    }
-    
-    if (errors.length) throw new Error(errors.join('\n'));
-  }
-
-  async function submitForm(data) {
-    const formPayload = new URLSearchParams();
-    formPayload.append('Фамилия Имя', data.name);
-    formPayload.append('Сможете ли вы присутствовать?', data.attendance);
-    formPayload.append('Будет ли с вами кто-то еще?', data.companions);
-    formPayload.append('Останетесь в ночь на второй день?', data.stay);
-    formPayload.append('Предпочтения по напиткам', data.drinks);
-    
-    if (data.attendance === "Смогу прийти") {
-      formPayload.append('Phone', data.phone);
-    }
-
-    const response = await fetch(form.action, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formPayload
+  
+  document.querySelectorAll('input[name="Останетесь в ночь на второй день?"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      hideError('error_1748857824432');
     });
-
-    if (!response.ok) throw new Error('Ошибка сервера');
-    
-    const result = await response.json();
-    if (!result.success) throw new Error(result.error || 'Ошибка сохранения данных');
-  }
-
-  function completeSubmission() {
-    localStorage.setItem(FORM_SUBMISSION_KEY, 'true');
-    showMessage('Благодарим за ответ!', 'success');
-    disableForm();
-  }
-
-  // Вспомогательные функции
-  function disableForm() {
-    form.querySelectorAll('input, button, textarea, select').forEach(el => {
-      el.disabled = true;
+  });
+  
+  document.getElementById('input_1748857867347')?.addEventListener('input', function() {
+    hideError('error_1748857867347');
+  });
+  
+  document.querySelectorAll('.t-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      hideError('error_7639854942363');
     });
-    form.querySelector('.t-submit').style.opacity = '0.5';
-  }
-
-  function showMessage(text, type = 'success') {
-    const messageBox = form.querySelector('.js-successbox');
-    messageBox.textContent = text;
-    messageBox.style.display = 'block';
-    messageBox.style.color = type === 'success' ? '#4CAF50' : '#f44336';
-    
-    setTimeout(() => {
-      messageBox.style.display = 'none';
-    }, 5000);
-  }
+  });
 });
 </script>              
 
